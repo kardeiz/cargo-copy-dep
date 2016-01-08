@@ -1,0 +1,10 @@
+[package]
+authors = ["kardeiz <kardeiz@gmail.com>"]
+name = "cargo-copy-dep"
+version = "0.1.0"
+
+[dependencies]
+getopts = "0.2.14"
+glob = "0.2.10"
+rustc-serialize = "0.3.16"
+toml = "0.1.25"
