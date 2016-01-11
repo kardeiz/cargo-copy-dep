@@ -2,10 +2,8 @@ extern crate getopts;
 extern crate glob;
 extern crate toml;
 
-use getopts::Options;
-
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::io::prelude::*;
 use std::fs::{self, File};
 
@@ -15,11 +13,11 @@ fn main() {
 
   let args: Vec<String> = env::args().collect();
   
-  let mut opts = Options::new();
+  let mut opts = getopts::Options::new();
   
   opts
-    .optopt("o", "output", "Output directory", "DIR")
-    .optopt("c", "crate", "Crate to copy", "CRATE")
+    .reqopt("o", "out-dir", "Output directory", "DIR")
+    .reqopt("c", "crate", "Crate to copy", "CRATE")
     .optopt("l", "cargo-lock", "Path to Cargo.lock", "Cargo.lock")
     .optflag("h", "help", "Print this help menu");
 
@@ -33,63 +31,65 @@ fn main() {
     return;
   }
 
-  let pkg = matches
-    .opt_str("c")
+  let pkg = matches.opt_str("c")
     .expect("No crate specified");
 
-  let out = matches
-    .opt_str("o")
-    .expect("No output directory specified");
-
-  let cargo_home = env::var("CARGO_HOME").ok()
-    .map(PathBuf::from)
-    .or_else(|| env::home_dir().map(|p| p.join(".cargo") ))
-    .expect("Could not determine CARGO_HOME");
-        
-  let cargo_lock = matches
-    .opt_str("l")
-    .unwrap_or_else(|| "Cargo.lock".into() );
-
-  let _toml = {
-    let mut f = File::open(&cargo_lock).expect("No Cargo.lock");
-    let mut s = String::new();
-    f.read_to_string(&mut s).expect("Error reading Cargo.lock");
-    toml::Parser::new(&s).parse().expect("Error parsing Cargo.lock")
+  let out_dir = {
+    let d = matches
+      .opt_str("o")
+      .expect("No output directory specified");
+    Path::new(&cwd).join(&d).join(&pkg)
   };
+ 
+  let src_dir = {
+    
+    let cargo_lock = {
+      
+      let l = matches
+        .opt_str("l")
+        .unwrap_or_else(|| "Cargo.lock".into() );
+      
+      let o = File::open(&l).ok().and_then(|mut f| {
+        let mut s = String::new();
+        f.read_to_string(&mut s).ok().and_then(|_| {
+          toml::Parser::new(&s).parse()
+        })        
+      });
 
-  let version = _toml.get("package").iter()
-    .filter_map(|s| s.as_slice() )
-    .flat_map(|s| s)
-    .filter_map(|s| s.as_table() )
-    .filter(|s| s.get("name") == Some(&toml::Value::String(pkg.clone())))
-    .filter_map(|s| s.get("version") )
-    .filter_map(|s| s.as_str() )
-    .next()
-    .expect("Could not determine version");
+      o.expect("Could not read Cargo.lock")
+    };
 
-  let src_path = {
+    let version = &cargo_lock.get("package").iter()
+      .filter_map(|s| s.as_slice() )
+      .flat_map(|s| s)
+      .filter_map(|s| s.as_table() )
+      .filter(|s| s.get("name") == Some(&toml::Value::String(pkg.clone())))
+      .filter_map(|s| s.get("version") )
+      .filter_map(|s| s.as_str() )
+      .next()
+      .expect("Could not determine version");
+
+    let cargo_home = env::var("CARGO_HOME").ok()
+      .map(|d| d.into() )
+      .or_else(|| env::home_dir().map(|p| p.join(".cargo") ))
+      .expect("Could not determine $CARGO_HOME");
+
     let path = &cargo_home
       .join("registry")
       .join("src")
       .join("*")
-      .join( format!("{}-{}", &pkg, version) );
+      .join( format!("{}-{}", &pkg, &version) );
 
-    let path_str = path
-      .to_str()
-      .expect("Error converting path to string");
-
-    glob::glob(path_str).into_iter()
+    glob::glob(&path.to_string_lossy()).into_iter()
       .filter_map(|mut x| x.next() )
       .filter_map(|x| x.ok() )
       .next()
       .expect("Error determining source directory")
   };
 
-  let out_path = Path::new(&cwd).join(&out).join(&pkg);
+  env::set_current_dir(&src_dir).expect("Couldn't change directory");
 
-  env::set_current_dir(&src_path).expect("Couldn't change directory");
-
-  fs::create_dir(&out_path).expect("Could not create directory");
+  fs::create_dir(&out_dir).expect("Could not create directory");
 
   for path in glob::glob("**/*")
     .into_iter()
@@ -98,9 +98,9 @@ fn main() {
     
     if let Ok(m) = fs::metadata(&path) {
       if m.is_dir() {
-        fs::create_dir(&out_path.join(&path)).expect("Could not create directory");
+        fs::create_dir(&out_dir.join(&path)).expect("Could not create directory");
       } else {
-        fs::copy(&path, &out_path.join(&path)).expect("Could not copy file");
+        fs::copy(&path, &out_dir.join(&path)).expect("Could not copy file");
       }
     }
   }
