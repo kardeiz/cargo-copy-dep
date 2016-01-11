@@ -7,8 +7,6 @@ use std::path::Path;
 use std::io::prelude::*;
 use std::fs::{self, File};
 
-
-
 fn main() {
   
   let cwd = env::current_dir().expect("Couldn't get current directory");
@@ -18,8 +16,8 @@ fn main() {
   let mut opts = getopts::Options::new();
   
   opts
-    .reqopt("o", "out-dir", "Output directory", "DIR")
-    .reqopt("c", "crate", "Crate to copy", "CRATE")
+    .optopt("o", "out-dir", "Output directory", "DIR")
+    .optopt("c", "crate", "Crate to copy", "CRATE")
     .optopt("l", "cargo-lock", "Path to Cargo.lock", "Cargo.lock")
     .optflag("h", "help", "Print this help menu");
 
