@@ -7,6 +7,8 @@ use std::path::Path;
 use std::io::prelude::*;
 use std::fs::{self, File};
 
+
+
 fn main() {
   
   let cwd = env::current_dir().expect("Couldn't get current directory");
@@ -48,15 +50,18 @@ fn main() {
       let l = matches
         .opt_str("l")
         .unwrap_or_else(|| "Cargo.lock".into() );
-      
-      let o = File::open(&l).ok().and_then(|mut f| {
-        let mut s = String::new();
-        f.read_to_string(&mut s).ok().and_then(|_| {
-          toml::Parser::new(&s).parse()
-        })        
-      });
 
-      o.expect("Could not read Cargo.lock")
+      let reading = || -> std::io::Result<String> {
+        let mut f = try!(File::open(&l));
+        let mut s = String::new();
+        let _ = try!(f.read_to_string(&mut s));
+        Ok(s)
+      };
+
+      reading().ok()
+        .and_then(|x| toml::Parser::new(&x).parse() )
+        .expect("Could not read Cargo.lock")
+
     };
 
     let version = &cargo_lock.get("package").iter()
