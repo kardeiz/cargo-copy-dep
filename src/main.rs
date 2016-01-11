@@ -1,6 +1,5 @@
 extern crate getopts;
 extern crate glob;
-extern crate rustc_serialize;
 extern crate toml;
 
 use getopts::Options;
