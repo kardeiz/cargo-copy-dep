@@ -5,7 +5,7 @@ extern crate toml;
 use std::env;
 use std::path::Path;
 use std::io::prelude::*;
-use std::fs;
+use std::fs::{self, File};
 
 fn main() {
   
@@ -49,7 +49,7 @@ fn main() {
         .opt_str("l")
         .unwrap_or_else(|| "Cargo.lock".into() );
       
-      let o = fs::File::open(&l).ok().and_then(|mut f| {
+      let o = File::open(&l).ok().and_then(|mut f| {
         let mut s = String::new();
         f.read_to_string(&mut s).ok().and_then(|_| {
           toml::Parser::new(&s).parse()
